@@ -1,11 +1,10 @@
-import { Profile } from "passport-google-oauth20";
-import { User } from "express";
+import { Profile } from 'passport-google-oauth20'
 
 declare global {
   namespace Express {
     export interface User {
-      profile: Profile;
-      accessToken: string;
+      profile: Profile
+      accessToken: string
     }
   }
 }

@@ -19,7 +19,8 @@
     "express-session": "^1.17.3",
     "mongoose": "^6.6.5",
     "passport": "^0.6.0",
-    "passport-google-oauth20": "^2.0.0"
+    "passport-google-oauth20": "^2.0.0",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.12",
@@ -28,6 +29,7 @@
     "@types/node": "^18.11.0",
     "@types/passport": "^1.0.11",
     "@types/passport-google-oauth20": "^2.0.11",
+    "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
     "concurrently": "^7.4.0",
     "eslint": "^8.0.1",

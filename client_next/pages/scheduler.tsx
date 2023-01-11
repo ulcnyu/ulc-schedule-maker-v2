@@ -1,196 +1,19 @@
 import { NextPage } from 'next'
-import React, { useEffect, useState } from 'react'
-import { FaChevronDown, FaChevronUp, FaCopy, FaCheck } from 'react-icons/fa'
+import { useEffect, useState } from 'react'
+import { FaChevronDown } from 'react-icons/fa'
 
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
-
-import { Disclosure } from '@headlessui/react'
 
 import {
   ApiErrorResponse,
   ApiScheduleRequest,
   CalendarInfo,
   CourseSchedule,
-  Interval,
   Schedule
 } from '../../@types/scheduler'
-
-interface Props {
-  course: CourseSchedule
-}
-
-const Group: React.FC<Props> = ({ course }) => {
-  interface LocationString {
-    location: string
-    schedule: Array<JSX.Element | null>
-    scheduleString: string
-  }
-
-  const dayMap = new Map<number, string>([
-    [0, 'Sunday'],
-    [1, 'Monday'],
-    [2, 'Tuesday'],
-    [3, 'Wednesday'],
-    [4, 'Thursday'],
-    [5, 'Friday'],
-    [6, 'Saturday']
-  ])
-
-  const courseName = course.courseInfo.abbreviation
-
-  const locationStrings: LocationString[] = course.locationSchedules.map(
-    (ls) => {
-      const scheduleBlock = ls.dailySchedules.map((ds, index) => {
-        const intervalString = ds.intervals.reduce(
-          (prev: string, curr: Interval) => {
-            const startString = new Date(
-              curr.start
-            ).toLocaleTimeString()
-            const endString = new Date(
-              curr.end
-            ).toLocaleTimeString()
-
-            return prev + `${startString} - ${endString}; `
-          },
-          ''
-        )
-
-        return intervalString !== ''
-          ? (
-                    <li key={index}>
-                        {dayMap.get(ds.weekDay)}: {intervalString}
-                    </li>
-            )
-          : null
-      })
-
-      const scheduleString = ls.dailySchedules.reduce((prev, curr) => {
-        const intervalString = curr.intervals.reduce(
-          (prev: string, curr: Interval) => {
-            const startString = new Date(
-              curr.start
-            ).toLocaleTimeString()
-            const endString = new Date(
-              curr.end
-            ).toLocaleTimeString()
-
-            return prev + `${startString} - ${endString}; `
-          },
-          ''
-        )
-
-        return intervalString !== '' && dayMap.get(curr.weekDay) !== undefined
-          ? prev + `${dayMap.get(curr.weekDay)}: ${intervalString} \n`
-          : prev + ''
-      }, '')
-
-      return {
-        location: ls.location,
-        schedule: scheduleBlock,
-        scheduleString
-      }
-    }
-  )
-
-  const locationS = locationStrings.reduce(
-    (prev: string, curr: LocationString, index) => {
-      const newString = `${curr.location} \n ${curr.scheduleString}`
-      if (curr.scheduleString === '') {
-        return prev
-      }
-      return prev + newString
-    }, ''
-  )
-
-  const locationJsx = locationStrings.reduce(
-    (prev: JSX.Element, curr: LocationString, index) => {
-      let newJsx = (
-                <div key={index} className={index !== 0 ? 'mt-2 md:mt-0' : ''}>
-                    <h3 className="font-bold">{curr.location}</h3>
-                    <ul>{curr.schedule}</ul>
-                </div>
-      )
-
-      const hasValid = curr.schedule.reduce((prev, curr) => {
-        if (curr !== null) {
-          return true
-        }
-        return prev
-      }, false)
-
-      if (!hasValid) {
-        newJsx = <></>
-      }
-
-      return (
-                <>
-                    {prev}
-                    {newJsx}
-                </>
-      )
-    },
-        <></>
-  )
-
-  return (
-        <>
-            <Disclosure key={courseName} as="div" defaultOpen={true}>
-                {({ open }) => (
-                    <>
-                        <Disclosure.Button className="flex w-full justify-between rounded-lg bg-purple-100 px-4 py-2 text-left text-sm font-medium text-purple-900 hover:bg-purple-200 focus:outline-none focus-visible:ring focus-visible:ring-purple-500 focus-visible:ring-opacity-75">
-                            <span>{courseName}</span>
-                            <span className="my-auto">
-                                {open ? <FaChevronUp /> : <FaChevronDown />}
-                            </span>
-                        </Disclosure.Button>
-                        <Disclosure.Panel className="px-4 pt-2 pb-2 text-sm text-gray-500 grid grid-cols-1 md:grid-cols-2 relative">
-                            {locationJsx}
-                            <CopyButton copyText={locationS}></CopyButton>
-                        </Disclosure.Panel>
-                    </>
-                )}
-            </Disclosure>
-        </>
-  )
-}
-
-const CopyButton: React.FC<{ copyText: string }> = ({ copyText }) => {
-  const [isCopied, setIsCopied] = useState(false)
-
-  // TODO: Implement copy to clipboard functionality
-  async function copyTextToClipboard (text: string): Promise<void> {
-    if ('clipboard' in navigator) {
-      await navigator.clipboard.writeText(text)
-    } else {
-      document.execCommand('copy', true, text)
-    }
-  }
-
-  // onClick handler function for the copy button
-  const handleCopyClick = (): void => {
-    // Asynchronously call copyTextToClipboard
-    copyTextToClipboard(copyText)
-      .then(() => {
-        // If successful, update the isCopied state value
-        setIsCopied(true)
-        setTimeout(() => {
-          setIsCopied(false)
-        }, 1500)
-      })
-      .catch((err) => {
-        console.log(err)
-      })
-  }
-
-  return (
-    <div className='absolute top-2 right-0'>
-      <button onClick={handleCopyClick} className="btn btn-square bg-purple-100 hover:bg-purple-200 text-purple-900 border-0">
-        <span>{!isCopied ? <FaCopy /> : <FaCheck />}</span>
-      </button>
-    </div>
-  )
-}
+import { useRouter } from 'next/router'
+import Group from '../components/group'
 
 const Scheduler: NextPage = () => {
   const [calendars, setCalendars] = useState<CalendarInfo[]>([])
@@ -202,6 +25,8 @@ const Scheduler: NextPage = () => {
   const [searchText, setSearchText] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState<string>('')
 
+  const router = useRouter()
+
   useEffect(() => {
     void fetchCalendars()
   }, [])
@@ -210,7 +35,12 @@ const Scheduler: NextPage = () => {
     const res = await fetch('/api/calendars', {
       method: 'GET'
     })
-    const data: CalendarInfo[] = await res.json()
+
+    if (res.status === 401) {
+      await router.push('/login')
+    }
+
+    const data = await res.json() as CalendarInfo[]
     setCalendars(data)
   }
 
@@ -306,19 +136,18 @@ const Scheduler: NextPage = () => {
         }
       })
     })
-
     return isValid
   }
 
   const schedulesJs = schedules
     .filter((s) => {
       if (searchText.length !== 0) {
-        return s.courseInfo.abbreviation.toLowerCase().match(searchText.toLowerCase())
+        return (s.course.abbreviation?.toLowerCase().indexOf(searchText.toLowerCase()) ?? -1) > -1
       }
       return true
     })
     .map((s) => {
-      return isValidCourse(s) ? <Group course={s} key={s.courseInfo.abbreviation}></Group> : <></>
+      return isValidCourse(s) ? <Group course={s} key={s.course.abbreviation}></Group> : <></>
     })
 
   const form = (

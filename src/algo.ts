@@ -1,4 +1,76 @@
-import { Interval } from '../@types/scheduler'
+import {
+  Course,
+  CourseCatalog,
+  CourseSchedule,
+  DailySchedule,
+  DayNumber,
+  Interval,
+  LocationSchedule,
+  Schedule,
+  Shift
+} from '../@types/scheduler'
+
+export function bin (courses: CourseCatalog, locations: string[], shifts: Shift[]): Schedule {
+  // create empty schedule
+  const binnedSchedule: Schedule = []
+  courses.forEach((course: Course) => {
+    const courseSchedule: CourseSchedule = {
+      course,
+      locationSchedules: []
+    }
+    locations.forEach((location: string) => {
+      const locationSchedule: LocationSchedule = {
+        location,
+        dailySchedules: []
+      };
+      [0, 1, 2, 3, 4, 5, 6].forEach((weekDay: number) => {
+        locationSchedule.dailySchedules.push({
+          weekDay: weekDay as DayNumber,
+          intervals: []
+        })
+      })
+      courseSchedule.locationSchedules.push(locationSchedule)
+    })
+    binnedSchedule.push(courseSchedule)
+  })
+
+  // populate the schedule with the relevant intervals
+  shifts.forEach((shift: Shift) => {
+    shift.coursesGiven.forEach((courseGiven: string) => {
+      const relevantCourseSchedule = binnedSchedule.find(
+        (courseSchedule: CourseSchedule) => {
+          return (
+            courseSchedule.course.matchScore(courseGiven) > 0.9
+          ) // TODO: consider the matchString threshold
+        }
+      )
+      if (relevantCourseSchedule == null) {
+        return
+      }
+      const relevantLocationSchedule =
+                relevantCourseSchedule.locationSchedules.find(
+                  (locationSchedule: LocationSchedule) => {
+                    return shift.location === locationSchedule.location
+                  }
+                )
+      if (relevantLocationSchedule == null) {
+        return
+      }
+      const relevantDailySchedule =
+                relevantLocationSchedule.dailySchedules.find(
+                  (dailySchedule: DailySchedule) => {
+                    return shift.weekDay === dailySchedule.weekDay
+                  }
+                )
+      if (relevantDailySchedule != null) {
+        relevantDailySchedule.intervals.push(
+          new Interval(shift.start, shift.end)
+        )
+      }
+    })
+  })
+  return binnedSchedule
+}
 
 export function getClassSchedule (intervals: Interval[]): Interval[] {
   if (intervals.length === 0) {

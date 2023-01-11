@@ -1,4 +1,5 @@
 import { calendar_v3 } from '@googleapis/calendar'
+import { v4 } from 'uuid'
 import Event = calendar_v3.Schema$Event
 
 export interface CalendarInfo {
@@ -11,30 +12,52 @@ export interface Interval {
   end: Date
 }
 
-interface CourseInfoInterface {
-  name?: string // the official albert name
-  code?: string // eg CSCI-UA 101
-  abbreviation: string // the abbreviation used for the ulc calendar
-  department?: string
+interface CourseInterface {
+  supported: boolean // if the ulc provides tutoring for this class
+  abbreviation: string | undefined // the ulc abbreviation
+  name: string
+  department: string // department code (CSCI, MATH, etc)
+  courseId: string // course id in a department (101, 102, etc)
+  school: string // school code (UA, UY, etc)
+  uid: string // unique id of the string
 
-  // the likelihood that a given course (ie the course a student types into their event description)
-  // actually is this course
-  // returns a number between 0 and 1
   matchScore: (courseGiven: string) => number
 }
 
-export class CourseInfo implements CourseInfoInterface {
-  constructor (public abbreviation: string) {}
+export class Course implements CourseInterface {
+  public abbreviation: string | undefined
+  public uid: string
 
-  // this is our current implementation
+  constructor (
+    public name: string,
+    public school: string,
+    public courseId: string,
+    public department: string,
+    public supported: boolean,
+    abbreviation?: string,
+    uid?: string
+  ) {
+    if (!supported || typeof abbreviation === 'undefined') {
+      this.abbreviation = undefined
+    } else {
+      this.abbreviation = abbreviation
+    }
+
+    this.uid = uid ?? v4()
+  }
+
+  // TODO: have a fuzzier way to match a course
   matchScore (courseGiven: string): number {
-    return courseGiven === this.abbreviation ? 1 : 0
+    if (this.supported) {
+      return courseGiven === this.abbreviation ? 1 : 0
+    }
+    return 0
   }
 }
 
-export type CourseCatalog = CourseInfo[]
+export type CourseCatalog = Course[]
 
-type DayNumber = 0 | 1 | 2 | 3 | 4 | 5 | 6
+export type DayNumber = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 interface IntervalInterface {
   start: Date
@@ -50,10 +73,10 @@ export class Interval implements IntervalInterface {
 
   get weekDay (): DayNumber {
     const startWeekDay: number = this.start.getDay()
-    const endWeekDay: number = this.end.getDay()
-    if (startWeekDay !== endWeekDay) {
-      throw new Error('Event takes place over more than one day.')
-    }
+    // const endWeekDay: number = this.end.getDay()
+    // if (startWeekDay !== endWeekDay) {
+    //   throw new Error('Event takes place over more than one day.')
+    // }
     return startWeekDay as DayNumber
   }
 }
@@ -61,7 +84,6 @@ export class Interval implements IntervalInterface {
 export class Shift extends Interval {
   // the names of the courses the tutor is available to tutor
   // given in the ulc abbreviation and may contain input errors
-  // TODO: i'm not really sure about the naming of this property
   coursesGiven: string[] = []
   location: string
 
@@ -117,7 +139,6 @@ export interface DailySchedule {
 }
 
 // describes the schedule (of one specific course) for a given location
-// TODO: is this better as 'location' or 'label'?
 export interface LocationSchedule {
   location: string
   dailySchedules: DailySchedule[]
@@ -125,7 +146,7 @@ export interface LocationSchedule {
 
 // describes the schedule for a given course across multiple locations
 export interface CourseSchedule {
-  courseInfo: CourseInfo
+  course: Course
   locationSchedules: LocationSchedule[]
 }
 
@@ -148,10 +169,10 @@ interface ApiResponseInterface {
   message?: string
 }
 
-export class ApiSuccessResponse implements ApiResponseInterface {
+export class ApiSuccessResponse<T> implements ApiResponseInterface {
   status = ApiStatus.Success
 
-  constructor (public data: any) {
+  constructor (public data: T) {
     this.data = data
   }
 }
@@ -169,14 +190,11 @@ export class ApiErrorResponse implements ApiResponseInterface {
   status = ApiStatus.Error
   message: string
 
-  constructor (public error: string | Error, public data?: any) {
+  constructor (error: string | Error, public data?: any) {
     if (error instanceof Error) {
       this.message = error.message
     } else {
       this.message = error
-    }
-    if (data != null) {
-      this.data = data
     }
   }
 }
@@ -184,4 +202,12 @@ export class ApiErrorResponse implements ApiResponseInterface {
 export interface ApiScheduleRequest {
   calendars: CalendarInfo[]
   stagingWeek: Date // date of week's Sunday
+}
+
+export interface User {
+  uid: string
+  name: string
+  emails: string[]
+  isAdmin: boolean
+  isStudent: boolean
 }
